@@ -7,6 +7,7 @@ namespace Parse_Performance_Data
 {
     class Program
     {
+
         static void Main(string[] args)
             {
             
@@ -20,10 +21,10 @@ namespace Parse_Performance_Data
             Console.WriteLine("Copyright (C) 2010-2016 Ryan Bijkerk");
             Console.WriteLine("Logit Blog - www.logitblog.com");
             Console.WriteLine("");
-            
-            // Check for Excel 2013 or 2016
-            var ExcelCheck = new ReportHandler();
-            ExcelCheck.Version();
+
+            var seperator = ',';
+
+            //ExcelCheck.Version();
 
             // Check the arguments
             var argumentHandler = new ArgumentHandler();
@@ -48,16 +49,18 @@ namespace Parse_Performance_Data
                 Console.WriteLine("{0}: Working on file: {1}", DateTime.Now, fileItem);
 
                 // File Parse for the data
-                var fileResults = file.Parse(fileItem, metrics);
+                var fileResults = file.Parse(fileItem, metrics, seperator);
+
                 // File time interval data
-                var fileTime = file.Time(fileItem);
+                var fileOffset = file.Offset(fileItem, seperator);
+
                 // Create Excel file
                 var reportFile = report.Create(fileItem);
 
                 Console.WriteLine("{0}: Creating Excel report on location: {1}", DateTime.Now, reportFile);
 
                 // Add data to Excel file
-                report.AddData(reportFile, fileResults, fileTime);
+                report.AddData(reportFile, fileResults, fileOffset.Time, fileOffset.Lines);
                 // Add charts to Excel file
                 report.AddCharts(reportFile);
             }

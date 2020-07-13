@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Parse_Performance_Data.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,7 +18,7 @@ namespace Parse_Performance_Data
             }
         }
 
-        public string[,] Parse(string file, List<string> metrics)
+        public List<Results> Parse(string file, List<string> metrics, char seperator)
         {
             var error = new ErrorHandler();
             
@@ -36,18 +37,22 @@ namespace Parse_Performance_Data
                 error.Exit(4);
             }
 
+            // Interval
+            var offset = Offset(file, seperator);
+
             // File read
             var fileReader = new StreamReader(file);
-            
+
             // Boolen to adjust the array
             var createArray = true;
-            var totalResults = new string[0,0];
+            var totalResults = new string[0, 0];
+            var objectTotalResults = new List<Results>();
 
             // Create results list
             var fileResults = new List<string>();
 
             // Adding all headers
-            var fileHeader = fileReader.ReadLine().Split(',');
+            var fileHeader = fileReader.ReadLine().Split(seperator);
             var j = 0;
 
             foreach (var metric in metrics)
@@ -59,20 +64,47 @@ namespace Parse_Performance_Data
                     if (fileHeader[i].Contains(metric))
                     {
                         // Add header to set of results
-                        fileResults.Add(fileHeader[i].Trim(new Char[] { '"' }));
+                        fileResults.Add(metric);
+                        var objectFileResult = new Results
+                        {
+                            File = file,
+                            Header = metric
+                        };
+ 
+                        var dataResults = new List<string>();
+
+                        TimeSpan timeStamp = new TimeSpan(0, 0, 0);
 
                         // Gatheing results of selected metric
                         while (!fileReader.EndOfStream)
                         {
                             var csvLine = fileReader.ReadLine();
-                            var csvValues = csvLine.Split(',');
+                            var csvValues = csvLine.Split(seperator);
 
-                            // Check for egnough columns to prevent out of bounds exception
-                            if (i <= csvValues.Count())
+                            // Check for columns to prevent out of bounds exception
+                            if (i <= csvValues.Count() - 1)
                             {
                                 // Adding results to list
                                 if (csvValues[i] != fileHeader[i])
+                                {
                                     fileResults.Add(csvValues[i].Trim(new Char[] { '"' }));
+                                    dataResults.Add(csvValues[i].Trim(new Char[] { '"' }));
+
+                                    var value = 0.0;
+                                    try
+                                    {
+                                        value = Convert.ToDouble(csvValues[i].Trim(new Char[] { '"' }));
+                                    }
+                                    catch (Exception)
+                                    {
+                                        //Console.WriteLine(e);
+                                    }
+
+                                    var interval = timeStamp;
+                                    var dateTime = Convert.ToDateTime(csvValues[0].Trim(new Char[] { '"' }));
+
+                                    timeStamp = timeStamp.Add(TimeSpan.FromSeconds(offset.Time));
+                                }
                             }
                         }
 
@@ -85,6 +117,10 @@ namespace Parse_Performance_Data
 
                         // set counter for mutli array
                         var k = 0;
+
+                        // add result to object and list with all the results
+                        objectFileResult.Data = dataResults;
+                        objectTotalResults.Add(objectFileResult);
 
                         // Add data to total array
                         foreach (var item in fileResults.ToArray())
@@ -109,7 +145,73 @@ namespace Parse_Performance_Data
             fileReader.Close();
 
             // Returing all results of the metric
-            return totalResults;
+            return objectTotalResults;
+        }
+
+        public Offset Offset(string file, char separator)
+        {
+            // Opening csv file
+            var fileReader = new StreamReader(file);
+
+            // Adding all headers
+            var fileHeader = fileReader.ReadLine().Split(separator);
+
+            // Define list and default time
+            var timeList = new List<DateTime>();
+            var timeDiffList = new List<double>();
+            var time = new double();
+
+            // Read all lines and add to timeList
+            while (!fileReader.EndOfStream)
+            {
+                var csvLine = fileReader.ReadLine().Split(separator);
+                var timeLine = csvLine[0].Substring(csvLine[0].LastIndexOf(' ') + 1).TrimEnd('\"', '\\');
+                timeList.Add(DateTime.Parse(timeLine));
+            }
+
+            // Get rounded times
+            for (int i = 0; i < timeList.Count; i++)
+            {
+                if (i + 1 <= timeList.Count - 1)
+                {
+                    var num = Math.Floor((timeList[i + 1] - timeList[i]).TotalSeconds);
+                    var round = ((int)Math.Round(num / 10.0)) * 10;
+                    timeDiffList.Add(round);
+                }
+            }
+
+            var uniques = timeDiffList.Distinct().ToList();
+
+            if (uniques.Count > 1)
+            {
+                var bestCount = 0;
+
+                foreach (var unique in uniques)
+                {
+
+                    var amountDiff = timeDiffList.Count(x => x.Equals(unique));
+                    if (amountDiff > bestCount)
+                    {
+                        bestCount = amountDiff;
+                        time = unique;
+                    }
+                }
+
+
+                //Console.WriteLine("Not good");
+            }
+            else
+            {
+                time = timeDiffList[0];
+            }
+
+            var retunObject = new Offset { Lines = timeList.Count, Time = time };
+
+            // Closing open csv file
+            fileReader.Close();
+
+            // Returing all results of the metric
+            return retunObject;
         }
 
         public double Time(string file)

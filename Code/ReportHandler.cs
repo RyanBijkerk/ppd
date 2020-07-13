@@ -1,13 +1,27 @@
-﻿using System;
+﻿using OfficeOpenXml;
+using OfficeOpenXml.Drawing.Chart;
+using Parse_Performance_Data.Models;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Excel = Microsoft.Office.Interop.Excel;
+using System.Text.RegularExpressions;
 
 namespace Parse_Performance_Data
 {
-    class ReportHandler
+    public class ReportHandler
     {
+        private readonly ErrorHandler _errorHandler;
+
+        public ReportHandler(ErrorHandler errorHandler)
+        {
+            _errorHandler = errorHandler;
+        }
+
+        public ReportHandler()
+        {
+        }
+
         public void Version()
         {
             var error = new ErrorHandler();
@@ -22,271 +36,279 @@ namespace Parse_Performance_Data
 
         public string Create(string file)
         {
-            var error = new ErrorHandler();
-
             var cleanFile = Path.GetFileNameWithoutExtension(file);
             var location = Path.GetDirectoryName(file);
             var reportFile = location + "\\" + cleanFile + ".xlsx";
 
             if (!File.Exists(reportFile))
             {
-                var excel = new Excel.Application { DisplayAlerts = false };
-                // Creatring file
-                excel.Workbooks.Add();
-
-                // Creating sheet for Charts
-                var workSheet = (Excel.Worksheet)excel.ActiveSheet;
-                workSheet.Name = "Charts";
-
-                // Delete default sheets in Office 2010
-                for (int i = 1; i < excel.Sheets.Count +1; i++)
+                using (var fs = new FileStream(reportFile, FileMode.Create, FileAccess.Write))
                 {
-                    if (excel.Sheets[i].Name != "Charts")
-                    {
-                        excel.Sheets[i].Delete();
-                    }
+                    var excel = new ExcelPackage();
+
+                    excel.Workbook.Properties.Author = "Ryan Ververs-Bijkerk";
+                    excel.Workbook.Properties.Company = "Logit Blog";
+                    excel.Workbook.Worksheets.Add("Charts");
+
+                    excel.SaveAs(fs);
                 }
-
-                // Save excel sheet
-                workSheet.SaveAs(reportFile);
-
-                // Close sheet
-                excel.Quit();
-            }
-            else
-            {
-                Console.WriteLine("{0}: File already exsits: {1}", DateTime.Now, reportFile);
-                error.Exit(183);
             }
 
             return reportFile;
         }
 
-        public void AddData(string reportFile, string[,] results, double time)
+        public void AddData(string reportFile, List<Results> results, double time, int lines)
         {
-            var excel = new Excel.Application {DisplayAlerts = false};
-
-            // Open report file
-            excel.Workbooks.Open(reportFile);
-
-            // Open the report Excel sheet
-            Excel._Worksheet workSheet = (Excel.Worksheet)excel.ActiveSheet;
-
-            // BLOCK EDIT
-            var colomn = 0;
-
-            var sheetNames = new List<string>();
-
-            var arrayLength = results.GetLength(0) - 1;
-            for (int i = 0; i <= arrayLength; i++)
+            var file = new FileInfo(reportFile);
+            using (var excel = new ExcelPackage(file))
             {
-                var arraySecondLength = results.GetLength(1) - 1;
-                for (int j = 0; j <= arraySecondLength; j++)
+                var workSheet = excel.Workbook.Worksheets.FirstOrDefault();
+                var colomn = 0;
+
+                foreach (var result in results)
                 {
-                    if (j == 0 && results[i, j] != null)
+                    var sheetName = result.Header;
+
+                    if (sheetName.Contains('\\'))
                     {
+                        var regex = new Regex(@"[\\]{2}(?<host>.+)\\.+\\(?<metric>.+)");
+                        var match = regex.Match(sheetName);
 
-                        // Set the sheetname based on metric from last /
-                        var sheetName = results[i, j];
-                        if (sheetName.Contains('\\'))
+                        if (match.Success)
                         {
-                            if (sheetName.Contains("(vmhba"))
-                            {
-                                sheetName = sheetName.Substring(sheetName.LastIndexOf('('));
-                            }
-                            else if (sheetName.Contains("vmnic"))
-                            {
-                                sheetName = sheetName.Substring(sheetName.LastIndexOf(":") + 1);
-                                sheetName = "(" + sheetName;
-
-                            }
-                            else
-                            {
-                                sheetName = sheetName.Substring(sheetName.LastIndexOf('\\') + 1);
-                            }
-
-                        }
-                        else if (sheetName.Contains(':'))
-                        {
-                            sheetName = sheetName.Substring(sheetName.LastIndexOf(':') + 1);
+                            sheetName = match.Groups[1].Value + "-" + match.Groups[2].Value;
                         }
 
-                        char[] charsToTrim = { '\\', '/', '?', '*', '[', ']', ':' };
-
-                        // Replace each carh for a <space>
-                        foreach (var trimChar in charsToTrim)
+                        if (sheetName.Contains("(vmhba"))
                         {
-                            sheetName = sheetName.Replace(trimChar, ' ');
-                        }
-
-                        var maxLength = 30;
-                        if (sheetName.Length > maxLength)
-                        {
-                            //var maxBeginPoint = sheetName.Length - maxLength;
-                            sheetName = sheetName.Substring(0, maxLength);
-                        }
-
-                        if (!sheetNames.Exists(s => s.Equals(sheetName)))
-                        {
-                            sheetNames.Add(sheetName);
+                            sheetName = sheetName.Substring(sheetName.LastIndexOf('('));
                         }
                         else
                         {
-                            var sheetIndex = sheetNames.FindIndex(s => s.Equals(sheetName));
-                            sheetName = sheetIndex.ToString() + sheetName;
-                            sheetNames.Add(sheetName);
+                            sheetName = sheetName.Substring(sheetName.LastIndexOf('\\') + 1);
                         }
-                        
-                        // Add new sheet
-                        workSheet = excel.Application.Worksheets.Add();
-                        workSheet.Move(After: excel.Sheets[excel.Sheets.Count]);
-                        workSheet.Name = sheetName;
 
-                        // Add time range to excel sheet
-                        TimeSpan timeStamp = new TimeSpan(0, 0, 0);
-                        var rowLength = results.GetLength(1);
+                    }
+                    else if (sheetName.Contains(':'))
+                    {
+                        sheetName = sheetName.Substring(sheetName.LastIndexOf(':') + 1);
+                    }
+
+                    char[] charsToTrim = { '\\', '/', '?', '*', '[', ']', ':' };
+
+                    // Replace each carh for a <space>
+                    foreach (var trimChar in charsToTrim)
+                    {
+                        sheetName = sheetName.Replace(trimChar, ' ');
+                    }
+                    var maxLength = 31;
+                    if (sheetName.Length > maxLength)
+                    {
+                        //var maxBeginPoint = sheetName.Length - maxLength;
+                        sheetName = sheetName.Substring(0, maxLength);
+                    }
+
+                    // Check if worksheet exists and if not add new sheet
+                    var sheetFound = false;
+
+                    // Loop trough sheets
+                    foreach (var sheet in excel.Workbook.Worksheets)
+                    {
+                        if (sheet.Name == sheetName)
+                        {
+                            // If found break from the loop
+                            sheetFound = true;
+                            break;
+                        }
+                    }
+                    // If not found add the new sheet else set as active
+                    if (!sheetFound)
+                    {
+                        workSheet = excel.Workbook.Worksheets.Add(sheetName);
+                        excel.Workbook.Worksheets.MoveToEnd(sheetName);
+
+                    }
+                    else
+                    {
+                        workSheet = excel.Workbook.Worksheets.FirstOrDefault(w => w.Name == sheetName);
+                    }
+
+
+                    // Add time range to excel sheet
+                    TimeSpan timeStamp = new TimeSpan(0, 0, 0);
+                    var rowLength = result.Data.Count + 1;
+
+                    // Check if time is set in the sheet
+                    var header = (workSheet.Cells[1, 1]).Value;
+                    if ((string)header != $"Time")
+                    {
                         for (int k = 1; k <= rowLength; k++)
                         {
                             if (k == 1)
                             {
-                                workSheet.Cells[k, 1] = "Time";
+                                workSheet.Cells[k, 1].Value = "Time";
                             }
                             else
                             {
-                                workSheet.Cells[k, 1] = timeStamp.ToString();
+                                workSheet.Cells[k, 1].Value = timeStamp.ToString();
                                 timeStamp = timeStamp.Add(TimeSpan.FromSeconds(time));
                             }
                         }
-                        colomn = 2;
-                        
                     }
-                    var row = j + 1;
 
-                    // Add results to excell sheet
-                    if (j == 0)
+                    colomn = workSheet.Dimension.Columns + 1;
+
+                    var row = 1;
+
+                    workSheet.Cells[row, colomn].Value = "Results";
+                    row++;
+
+                    foreach (var data in result.Data)
                     {
-                        workSheet.Cells[row, colomn] = "Results";
-                    }
-                    else if (results[i, j] != null)
-                    {
-                        workSheet.Cells[row, colomn] = results[i, j];
+
+                        try
+                        {
+                            workSheet.Cells[row, colomn].Value = Convert.ToDouble(data);
+                        }
+                        catch
+                        {
+                            workSheet.Cells[row, colomn].Value = data;
+                        }
+                        row++;
                     }
                 }
-            }
 
-            var error = new ErrorHandler();
+                //for (int i = 0; i <= arrayLength; i++)
+                //{
+                //    var r = 0;
+                //    for (int j = 0; j <= arraySecondLength; j++)
+                //    {
+                //        if (j == 0 && results[i, j] != null)
+                //        {
+                //            // Set the sheetname based on metric from last /
+                //            var sheetName = results[i, j];
 
-            try
-            {
-                // Save excel sheet
-                workSheet.SaveAs(reportFile);
-            }
-            catch (Exception)
-            {
-                excel.Quit();
-                error.Exit(93);
-            }
+                //        }
+                //        var row = r + 1;
 
-            // Close sheet
-            excel.Quit();
+                //        // Add results to excell sheet
+                //        if (j == 0)
+                //        {
+                //            workSheet.Cells[row, colomn].Value = run;
+                //        }
+                //        else if (results[i, j] != null)
+                //        {
+                //            if (lines > 1)
+                //            {
+                //                var averageList = new List<double>();
+
+                //                for (int av = 0; av < lines; av++)
+                //                {
+                //                    var avi = j + av;
+                //                    var max = results.GetLength(1) - 1;
+                //                    if (avi <= max)
+                //                    {
+
+                //                        try
+                //                        {
+                //                            averageList.Add(Convert.ToDouble(results[i, avi]));
+                //                        }
+                //                        catch
+                //                        {
+                //                            // ignore this result 
+                //                        }
+                //                    }
+                //                }
+                //                try
+                //                {
+                //                    var averageResult = averageList.Average();
+                //                    workSheet.Cells[row, colomn].Value = (double) averageResult;
+                //                }
+                //                catch
+                //                {
+                //                    // ignore results
+                //                }
+
+
+                //                j = j + lines - 1;
+
+                //            }
+                //            else
+                //            {
+                //                try
+                //                {
+                //                    workSheet.Cells[row, colomn].Value = Convert.ToDouble(results[i, j]);
+                //                }
+                //                catch
+                //                {
+                //                    workSheet.Cells[row, colomn].Value = results[i, j];
+                //                }
+
+
+                //            }
+                //        }
+
+                //        r++;
+                //    }
+                //}
+
+                var error = new ErrorHandler();
+
+                try
+                {
+                    excel.SaveAs(file);
+                }
+                catch (Exception)
+                {
+                    error.Exit(93);
+                }
+            }
+            
         }
-
+        
         public void AddCharts(string reportFile)
         {
-            var excel = new Excel.Application() {DisplayAlerts = false};
-            excel.Workbooks.Open(reportFile);
-            Excel._Worksheet workSheet = (Excel.Worksheet)excel.ActiveSheet;
-
-            var sheetNumber = 1;
-            var chartPositionNumber = 2;
-            foreach (Excel.Worksheet sheet in excel.Worksheets)
+            var file = new FileInfo(reportFile);
+            using (var excel = new ExcelPackage(file))
             {
-                if (sheet.Name != "Charts")
+                var chartPositionNumber = 1;
+
+                var workSheet = excel.Workbook.Worksheets.FirstOrDefault(w => w.Name == "Charts");
+
+                foreach (var sheet in excel.Workbook.Worksheets)
                 {
-                    // Set the datasheet for the source of the data
-                    Excel.Worksheet dataSheet = excel.Worksheets[sheetNumber];
 
-                    // Open the chart sheet to save the charts
-                    workSheet = excel.ActiveWorkbook.Sheets["Charts"];
-                    workSheet.Select();
-
-                    // Get column & row length
-                    var colomn = dataSheet.UsedRange.Columns.Count;
-                    var rows = dataSheet.UsedRange.Rows.Count - 1;
-
-                    // Chart settings and stuff
-                    Excel.ChartObjects xlCharts = (Excel.ChartObjects)workSheet.ChartObjects(Type.Missing);
-                    Excel.ChartObject runChart = (Excel.ChartObject)xlCharts.Add(10, 80, 300, 250);
-
-                    Excel.Chart runChartPage = runChart.Chart;
-
-                    runChartPage.ChartType = Excel.XlChartType.xlLine;
-
-                    // set ChartStyle based on Office version
-                    var chartStyle = 301;
-                    if (Type.GetTypeFromProgID("Excel.Application.14") != null)
+                    if (sheet.Name != "Charts")
                     {
-                        chartStyle = 2;
+                        var resultChart = workSheet.Drawings.AddChart(Guid.NewGuid().ToString(), eChartType.Line);
+                        resultChart.SetPosition(chartPositionNumber, 0, 1, 0);
+                        resultChart.SetSize(650, 440);
+                        resultChart.Title.Text = "Result " + sheet.Name;
+                        resultChart.Legend.Add();
+                        resultChart.Style = eChartStyle.Style10;
+
+                        chartPositionNumber = chartPositionNumber + 24;
+
+                        var runRows = sheet.Dimension.Rows - 1;
+                        var runColomns = sheet.Dimension.Columns - 1;
+                        var runTime = sheet.Cells[2, 1, runRows, 1];
+
+                        var resultData = sheet.Cells[2, (sheet.Dimension.Columns), (sheet.Dimension.Rows + 1), (sheet.Dimension.Columns)];
+                        var resultSerie = resultChart.Series.Add(resultData, runTime);
+                        resultSerie.Header = "Result";
                     }
 
-                    runChartPage.HasTitle = true;
-                    runChartPage.HasLegend = true;
-                    runChartPage.ChartTitle.Text = sheet.Name;
-                    runChartPage.ChartStyle = chartStyle;
-
-                    // Position of chart
-                    var runChartPosition = "B" + chartPositionNumber;
-                    Excel.Range runChartPlacementRange = workSheet.get_Range(runChartPosition, runChartPosition);
-
-                    runChart.Top = runChartPlacementRange.Top;
-                    runChart.Left = runChartPlacementRange.Left;
-
-                    chartPositionNumber = chartPositionNumber + 21;
-
-                    // Size of Chart
-                    runChart.Width = 500;
-                    runChart.Height = 250;
-                    Excel.SeriesCollection runSeriesCollection = runChartPage.SeriesCollection();
-
-                    // Create run line chart
-                    for (int i = 2; i <= (colomn); i++)
-                    {
-
-                        Excel.Series runSeries = runSeriesCollection.NewSeries();
-                        runSeries.Name = dataSheet.Cells[1, i].Value;
-
-
-                        // set correct range for chart data
-                        var ia = i;
-                        // Time range
-                        var xValuesBegin = ParseColumnName(1) + "2";
-                        var xValuesEnd = ParseColumnName(1) + (rows.ToString());
-
-                        var valuesBegin = ParseColumnName(ia) + (2).ToString();
-                        var valuesEnd = ParseColumnName(ia) + (rows + 1).ToString();
-
-                        runSeries.XValues = dataSheet.get_Range(xValuesBegin, xValuesEnd);
-                        runSeries.Values = dataSheet.get_Range(valuesBegin, valuesEnd);
-                    }
                 }
-                sheetNumber++;
-            }
 
-            var error = new ErrorHandler();
-
-            try
-            {
-                // Save excel sheet
-                workSheet.SaveAs(reportFile);
+                try
+                {
+                    excel.Save();
+                }
+                catch (Exception)
+                {
+                    _errorHandler.Exit(93);
+                }
             }
-            catch (Exception)
-            {
-                excel.Quit();
-                error.Exit(93);
-            }
-
-            // Close sheet
-            excel.Quit();
         }
 
         public string ParseColumnName(int columnNumber)

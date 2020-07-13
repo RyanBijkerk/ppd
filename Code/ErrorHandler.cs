@@ -2,53 +2,46 @@
 
 namespace Parse_Performance_Data
 {
-    class ErrorHandler
+    public class ErrorHandler
     {
-        public void Exit(int Code)
+        public void Exit(int code)
         {
-            if (Code == 2)
+            switch (code)
             {
-                Console.WriteLine("{0}: Error code {1}: The system cannot find the file specified.", DateTime.Now, Code);
-                Environment.Exit(Code);
-            }
-            
-            if (Code == 4)
-            {
-                Console.WriteLine("{0}: Error code {1}: The system cannot open the file.", DateTime.Now, Code);
-                Environment.Exit(Code);
-            }
-
-            if (Code == 13)
-            {
-                Console.WriteLine("{0}: Error code {1}: The data is invalid.", DateTime.Now, Code);
-                Environment.Exit(Code);
-            }
-
-            if (Code == 93)
-            {
-                Console.WriteLine("{0}: Error code {1}: File in use.", DateTime.Now, Code);
-                Environment.Exit(Code);
-            }
-
-
-            if (Code == 160)
-            {
-                Console.WriteLine("{0}: Error code {1}: One or more arguments are not correct.", DateTime.Now, Code);
-                Environment.Exit(Code);
-            }
-
-            if (Code == 183)
-            {
-                Console.WriteLine("{0}: Error code {1}: Cannot create a file when that file already exists.", DateTime.Now, Code);
-                Environment.Exit(Code);
+                case 2:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: The system cannot find the file specified.", DateTime.Now,
+                        code);
+                    break;
+                case 3:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: The system cannot find the location specified.");
+                    break;
+                case 4:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: The system cannot open the file.");
+                    break;
+                case 13:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: The data is invalid.");
+                    break;
+                case 93:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: File in use.");
+                    break;
+                case 160:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: One or more arguments are not correct.");
+                    break;
+                case 161:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: Invalid precentage parameter.");
+                    break;
+                case 162:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: Precentage parameter must be between 0 and 100.");
+                    break;
+                case 183:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: Cannot create a file when that file already exists.");
+                    break;
+                default:
+                    Console.WriteLine($"{DateTime.Now}: Error code {code}:: Unknown error code.");
+                    break;
             }
 
-            if (Code == 2013)
-            {
-                Console.WriteLine("{0}: Error code {1}: Microsoft Excel is missing.", DateTime.Now, Code);
-                Environment.Exit(Code);
-            }
-
+            Environment.Exit(code);
         }
 
     }
