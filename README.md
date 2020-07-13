@@ -37,3 +37,6 @@ This section will describe how to use the tool.
 </tr>
 </tbody>
 </table>
+
+## Feedback or ideas
+Please share your feedback, I’m always looking for ways to improve the tool. Please provide feedback at Logit Blog right [here](https://www.logitblog.com/tooling/parse-performance-data/).
