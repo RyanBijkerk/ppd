@@ -1,6 +1,6 @@
 # Parse Performance Data
 
-Parse Performance Data (PPD) that quickly parses large performance CSV files and creates a Microsoft Excel report in a couple of seconds. This helps to collect the interesting metrics from the file and it even creates charts for each metric that is configured.
+Parse Performance Data (PPD) quickly parses large performance CSV files and creates a Microsoft Excel report in a couple of seconds. This helps to collect the interesting metrics from the file and it even creates charts for each metric that is configured.
 
 ## Requirements:
 Microsoft Excel 2010, 2013 or 2016
