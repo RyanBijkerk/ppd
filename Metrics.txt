@@ -1,0 +1,9 @@
+﻿# VMware ESXtop
+(_Total)\% Util Time
+Physical Disk Adapter(vmhba0)\Commands/sec
+Physical Disk Adapter(vmhba0)\Reads/sec
+Physical Disk Adapter(vmhba0)\Writes/sec
+# Microsoft Performance Monitor
+Process(System)\% Processor Time
+PhysicalDisk(_Total)\Disk Reads/sec
+PhysicalDisk(_Total)\Disk Writes/sec
