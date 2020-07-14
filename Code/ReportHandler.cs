@@ -1,5 +1,6 @@
 ﻿using OfficeOpenXml;
 using OfficeOpenXml.Drawing.Chart;
+using OfficeOpenXml.Drawing.Chart.Style;
 using Parse_Performance_Data.Models;
 using System;
 using System.Collections.Generic;
@@ -36,6 +37,8 @@ namespace Parse_Performance_Data
 
         public string Create(string file)
         {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
             var cleanFile = Path.GetFileNameWithoutExtension(file);
             var location = Path.GetDirectoryName(file);
             var reportFile = location + "\\" + cleanFile + ".xlsx";
@@ -59,6 +62,8 @@ namespace Parse_Performance_Data
 
         public void AddData(string reportFile, List<Results> results, double time, int lines)
         {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
             var file = new FileInfo(reportFile);
             using (var excel = new ExcelPackage(file))
             {
@@ -268,6 +273,8 @@ namespace Parse_Performance_Data
         
         public void AddCharts(string reportFile)
         {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
             var file = new FileInfo(reportFile);
             using (var excel = new ExcelPackage(file))
             {
@@ -277,15 +284,15 @@ namespace Parse_Performance_Data
 
                 foreach (var sheet in excel.Workbook.Worksheets)
                 {
-
+                   
                     if (sheet.Name != "Charts")
                     {
-                        var resultChart = workSheet.Drawings.AddChart(Guid.NewGuid().ToString(), eChartType.Line);
+                        var resultChart = workSheet.Drawings.AddLineChart(Guid.NewGuid().ToString(), eLineChartType.Line);
                         resultChart.SetPosition(chartPositionNumber, 0, 1, 0);
-                        resultChart.SetSize(650, 440);
+                        resultChart.SetSize(1300, 440);
                         resultChart.Title.Text = "Result " + sheet.Name;
                         resultChart.Legend.Add();
-                        resultChart.Style = eChartStyle.Style10;
+                        resultChart.StyleManager.SetChartStyle(ePresetChartStyle.LineChartStyle7);
 
                         chartPositionNumber = chartPositionNumber + 24;
 
